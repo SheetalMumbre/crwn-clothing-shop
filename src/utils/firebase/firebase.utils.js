@@ -1,12 +1,25 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-import {getAuth, signInWithRedirect, signInWithPopup, GoogleAuthProvider,
-createUserWithEmailAndPassword, signInWithEmailAndPassword} from "firebase/auth"
+import { initializeApp } from 'firebase/app';
+import {
+  getAuth,
+  signInWithRedirect,
+  signInWithPopup,
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from 'firebase/auth';
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  writeBatch,
+  query,
+  getDocs,
+} from 'firebase/firestore';
 
-import{ getFirestore, doc, getDoc, setDoc } from 'firebase/firestore'
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBnmVKx3oRsHy3x4s0q1yFwjLahcOb1mKU",
   authDomain: "crwn-clothing-db-e4641.firebaseapp.com",
@@ -17,61 +30,91 @@ const firebaseConfig = {
 };
 
 
-
-// Initialize Firebase
 const firebaseApp = initializeApp(firebaseConfig);
 
-const provider = new GoogleAuthProvider();
+const googleProvider = new GoogleAuthProvider();
 
-provider.getCustomParameters({
-    prompt: 'select_account'
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
 });
 
 export const auth = getAuth();
-// console.log('auth - ' + auth)
-// debugger;
-export const signInWithGooglePopup = () => signInWithPopup(auth, provider);
-export const signInWithGoogleRedirect = () => signInWithRedirect(auth, provider);
+export const signInWithGooglePopup = () =>
+  signInWithPopup(auth, googleProvider);
+export const signInWithGoogleRedirect = () =>
+  signInWithRedirect(auth, googleProvider);
 
 export const db = getFirestore();
 
-export const createUserDocumentFromAuth = async (userAuth, additionalInformation ={}) =>{
-    if(!userAuth) return;   // if dont't receive auth then dont run function and return
-    const userDocRef = doc(db,'users', userAuth.uid);
-    console.log(userDocRef);
+export const addCollectionAndDocuments = async (
+  collectionKey,
+  objectsToAdd,
+  field
+) => {
+  const collectionRef = collection(db, collectionKey);
+  const batch = writeBatch(db);
 
-    const userSnapshot = await getDoc(userDocRef);
-    // console.log(userSnapshot);
-    // console.log(userSnapshot.exists());
+  objectsToAdd.forEach((object) => {
+    const docRef = doc(collectionRef, object.title.toLowerCase());
+    batch.set(docRef, object);
+  });
 
-    if(!userSnapshot.exists()){
-        const {displayName, email} = userAuth;
-        const createdAt = new Date();
+  await batch.commit();
+  console.log('done');
+};
 
-        try{
-            await setDoc(userDocRef,{
-                displayName,
-                email,
-                createdAt,
-                ...additionalInformation
-            });
-        }
-        catch(error){
-            console.log('error creating the user', error.message)
-        }
+export const getCategoriesAndDocuments = async () => {
+  const collectionRef = collection(db, 'categories');
+  const q = query(collectionRef);
+
+  // await Promise.reject(new Error('new error woops'))
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map((doc) => doc.data());
+};
+
+export const createUserDocumentFromAuth = async (
+  userAuth,
+  additionalInformation = {}
+) => {
+  if (!userAuth) return;
+
+  const userDocRef = doc(db, 'users', userAuth.uid);
+// data lives on userSnapshot
+// userDocRef is pointer to that space where that data lives
+  const userSnapshot = await getDoc(userDocRef);
+
+  if (!userSnapshot.exists()) {
+    const { displayName, email } = userAuth;
+    const createdAt = new Date();
+
+    try {
+      await setDoc(userDocRef, {
+        displayName,
+        email,
+        createdAt,
+        ...additionalInformation,
+      });
+    } catch (error) {
+      console.log('error creating the user', error.message);
     }
+  }
 
-    return  userDocRef;
+  return userDocRef;
 };
 
 export const createAuthUserWithEmailAndPassword = async (email, password) => {
-    if(!email || !password) return; // if not receive email or password then dont run function and return
+  if (!email || !password) return;
 
-    return await createUserWithEmailAndPassword (auth, email, password);
-}
+  return await createUserWithEmailAndPassword(auth, email, password);
+};
 
 export const signInAuthUserWithEmailAndPassword = async (email, password) => {
-    if(!email || !password) return; // if not receive email or password then dont run function and return
+  if (!email || !password) return;
 
-    return await signInWithEmailAndPassword (auth, email, password);
-}
+  return await signInWithEmailAndPassword(auth, email, password);
+};
+
+export const signOutUser = async () => await signOut(auth);
+
+export const onAuthStateChangedListener = (callback) =>
+  onAuthStateChanged(auth, callback);
